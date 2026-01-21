@@ -36,6 +36,31 @@ def extract_module_path(user_input, base_dir):
             return abs_path
     return None
 
+def get_project_context(module_path):
+    """
+    Traverses up from module_path to find dependency_graph.json.
+    Returns (project_root, graph_data) or (None, None).
+    """
+    current = module_path
+    # Security brake: don't go up forever, maybe stop at drive root or 5 levels
+    for _ in range(5):
+        parent = os.path.dirname(current)
+        if parent == current:
+            break
+        
+        graph_path = os.path.join(parent, "dependency_graph.json")
+        if os.path.exists(graph_path):
+            try:
+                with open(graph_path, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+                return parent, data
+            except Exception as e:
+                print(f"Error loading dependency graph: {e}")
+                return None, None
+        
+        current = parent
+    return None, None
+
 def main():
     parser = argparse.ArgumentParser(description="OpenCode Basic - Autonomous Coding Agent")
     parser.add_argument(
@@ -173,6 +198,15 @@ def main():
                                 current_prompt += dependency_context
                 else:
                     # Fallback if no path detected
+                    print(f"\n[WARNING] Ralph Mode (Auto-Test) NOT activated.")
+                    print(f"Reason: Could not find a valid module path containing 'test_spec.py' in your input.")
+                    print(f"Base Directory: {base_dir}")
+                    print(f"User Input: '{user_input}'")
+                    print("Please ensure:")
+                    print("1. You provide the correct relative path to the module (e.g., 'snake_game/GameLoop').")
+                    print("2. The 'test_spec.py' file exists in that directory.")
+                    print("3. Your working directory (--dir) matches where the project is located.\n")
+                    
                     agent.run(user_input)
             else:
                 # Standard mode

@@ -130,6 +130,7 @@ This directory contains:
 - **Maintenance**: When fixing bugs, prefer modifying the existing code over rewriting from scratch unless the changes are extensive.
 - **Importing**: Assume `interface.py` is in the same package. Use `from .interface import ...` or `from interface import ...` as appropriate for the structure.
 - **No Planning**: Do not create new modules or change the architecture. Just build what is asked.
+- **No Test Execution**: You do NOT need to write test runners or execute tests manually. The system will AUTOMATICALLY run `test_spec.py` against your code after you finish writing. Focus only on implementation.
 
 ### Example Workflow
 User: "Build the module at: ./calc/Adder"
