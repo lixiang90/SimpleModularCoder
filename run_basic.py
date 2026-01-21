@@ -183,6 +183,11 @@ def main():
                             # 1. Reset Agent (Prune Context)
                             print("Resetting agent context for next attempt...")
                             agent = Agent(base_dir=base_dir, system_prompt=system_prompt)
+                            # Re-apply constraints to the new agent instance
+                            agent.tool_set.set_constraints(
+                                allowed_dirs=[module_path],
+                                readonly_files=["test_spec.py", "PROMPT.md", "interface.py"]
+                            )
                             
                             # 2. Update Prompt with Error Info
                             # We strip previous context, just giving the error.
