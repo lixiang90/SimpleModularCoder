@@ -29,7 +29,7 @@ pip install openai pytest
 {
   "api_key": "sk-...",
   "base_url": "https://api.deepseek.com",
-  "model": "deepseek-coder",
+  "model": "deepseek-chat",
   "temperature": 0.0
 }
 ```
