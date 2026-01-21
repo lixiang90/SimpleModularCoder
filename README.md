@@ -1,111 +1,112 @@
-# SimpleModularCoder - 模块化自主编程 Agent
+# SimpleModularCoder - Autonomous Modular Coding Agent
 
-SimpleModularCoder 是一个轻量级但功能强大的模块化自主编程工具。它引入了现代软件工程中的“分而治之”思想，通过不同的 Agent 角色（架构师、构建器、程序员）协同工作，实现从高层设计到具体代码实现的自动化流程。
+SimpleModularCoder is a lightweight yet powerful autonomous modular coding tool. It incorporates the "Divide and Conquer" philosophy of modern software engineering, coordinating different Agent roles (Architect, Builder, Coder) to automate the process from high-level design to concrete code implementation.
 
-## 🌟 核心特性
+## 🌟 Key Features
 
-*   **多模式 Agent**: 支持 Coder（全能）、Architect（架构设计）、Pure Architect（纯接口设计）、Builder（单模块构建）四种模式。
-*   **Ralph 模式 (Iterative Repair)**: 构建器模式下内置“自动测试-修复循环”，自动运行测试用例并根据错误信息自我修正代码。
-*   **安全沙箱**:
-    *   **权限隔离**: Builder 模式强制锁定只能修改当前模块目录，严禁篡改测试用例和其他模块。
-    *   **命令审批**: 敏感的 Shell 命令执行需要 Human-in-the-Loop 人工审批。
-*   **增量更新**: 架构师和构建器均具备维护能力，支持在现有代码基础上进行接口升级和 Bug 修复。
+*   **Multi-Mode Agents**: Supports four modes: Coder (General Purpose), Architect (Architectural Design), Pure Architect (Interface Design Only), and Builder (Single Module Construction).
+*   **Ralph Mode (Iterative Repair)**: The Builder mode features a built-in "Auto Test-Repair Loop", automatically running test cases and self-correcting code based on error logs.
+*   **Security Sandbox**:
+    *   **Permission Isolation**: Builder mode strictly locks write permissions to the current module directory, explicitly prohibiting tampering with test cases or other modules.
+    *   **Command Approval**: Sensitive Shell command execution requires Human-in-the-Loop approval.
+*   **Incremental Updates**: Both Architect and Builder are capable of maintenance, supporting interface upgrades and bug fixes on existing code.
 
-## 🚀 快速开始
+## 🚀 Quick Start
 
-### 1. 安装依赖
+### 1. Install Dependencies
 
-确保你的 Python 环境版本 >= 3.8，并安装必要的依赖（如 `openai`, `pytest`）。
+Ensure your Python version is >= 3.8 and install necessary dependencies (e.g., `openai`, `pytest`).
 
 ```bash
 pip install openai pytest
 ```
 
-### 2. 配置 LLM
+### 2. Configure LLM
 
-在 `src/llm_config.json` 中配置你的 LLM 服务商信息（兼容 OpenAI 接口，如 DeepSeek, OpenAI, Claude 等）。
+Configure your LLM provider information in `src/llm_config.json` (compatible with OpenAI interface, such as DeepSeek, OpenAI, Claude, etc.).
 
 ```json
 {
   "api_key": "sk-...",
   "base_url": "https://api.deepseek.com",
-  "model": "deepseek-coder",
+  "model": "deepseek-chat",
   "temperature": 0.0
 }
 ```
 
-### 3. 启动 Agent
+### 3. Launch Agent
 
-工具入口为 `run_basic.py`，支持通过 `--mode` 参数切换不同模式。
+The entry point is `run_basic.py`. You can switch modes using the `--mode` argument.
 
-#### 🏗️ 模式一：纯架构师模式 (Pure Architect)
+#### 🏗️ Mode 1: Pure Architect Mode
 
-**适用场景**: 项目初期，需要设计系统模块、定义接口和编写测试规范，但不涉及具体实现。
+**Use Case**: Initial project phase. Design system modules, define interfaces, and write test specifications without implementation.
 
 ```bash
 python run_basic.py --mode pure_architect --dir ./workspace
 ```
 
-**交互示例**:
-> User: "设计一个贪吃蛇游戏系统"
+**Interaction Example**:
+> User: "Design a Snake Game system"
 >
-> **Agent 产物**:
-> - `dependency_graph.json`: 模块依赖关系
-> - `GameLoop/interface.py`: 游戏循环接口定义
-> - `GameLoop/test_spec.py`: 针对接口的测试用例
-> - `GameLoop/PROMPT.md`: 实现指南
+> **Agent Outputs**:
+> - `dependency_graph.json`: Module dependencies
+> - `GameLoop/interface.py`: Game loop interface definitions
+> - `GameLoop/test_spec.py`: Test cases for the interface
+> - `GameLoop/PROMPT.md`: Implementation guide
 
-#### 🔨 模式二：构建器模式 (Builder) - 推荐 🔥
+#### 🔨 Mode 2: Builder Mode - Recommended 🔥
 
-**适用场景**: 实现由架构师定义的单个模块。
+**Use Case**: Implement a single module defined by the Architect.
 
 ```bash
 python run_basic.py --mode builder --dir ./workspace
 ```
 
-**交互示例**:
-> User: "构建模块: ./workspace/GameLoop"
+**Interaction Example**:
+> User: "Build module: ./workspace/GameLoop"
 >
-> **Agent 行为**:
-> 1.  **锁定权限**: 只能写入 `GameLoop` 目录，禁止修改 `test_spec.py`。
-> 2.  **实现代码**: 读取接口和测试，编写 `implementation.py`。
-> 3.  **Ralph 循环**:
->     *   运行 `pytest GameLoop/test_spec.py`
->     *   ❌ 失败 -> 重置记忆 -> 读取错误日志 -> 修复代码
->     *   ✅ 成功 -> 任务结束
+> **Agent Behavior**:
+> 1.  **Lock Permissions**: Can ONLY write to `GameLoop` directory. Modifying `test_spec.py` is FORBIDDEN.
+> 2.  **Implement Code**: Reads interfaces and tests, writes `implementation.py`.
+> 3.  **Ralph Loop**:
+>     *   Runs `pytest GameLoop/test_spec.py`
+>     *   ❌ Fail -> Reset Memory -> Read Error Log -> Fix Code
+>     *   ✅ Success -> Task Complete
 
-#### 🏛️ 模式三：全能架构师模式 (Architect)
+#### 🏛️ Mode 3: Architect Mode (Full)
 
-**适用场景**: 快速原型开发，架构师不仅设计接口，还直接生成实现代码（不推荐用于复杂项目）。
+**Use Case**: Rapid prototyping. The Architect designs interfaces and also generates implementation code directly (not recommended for complex projects).
 
 ```bash
 python run_basic.py --mode architect --dir ./workspace
 ```
 
-#### 💻 模式四：通用程序员模式 (Coder) - 默认
+#### 💻 Mode 4: Coder Mode (General) - Default
 
-**适用场景**: 自由对话，执行任意编码任务。
+**Use Case**: Free-form conversation, executing arbitrary coding tasks.
 
 ```bash
 python run_basic.py --mode coder --dir ./workspace
 ```
 
-## 🛡️ 安全机制
+## 🛡️ Security Mechanisms
 
-1.  **命令执行**: Agent 尝试执行 `pytest` 或其他 Shell 命令时，控制台会弹出 `[SECURITY WARNING]`，需输入 `y` 确认。
-2.  **文件系统约束**: Builder 模式下，系统会拦截任何试图写入非目标模块目录的操作，防止 Agent "作弊"（如修改测试用例以通过测试）。
+1.  **Command Execution**: When the Agent attempts to execute `pytest` or other Shell commands, a `[SECURITY WARNING]` will appear in the console, requiring `y` to confirm.
+2.  **Filesystem Constraints**: In Builder mode, the system intercepts any attempt to write outside the target module directory to prevent Agent "cheating" (e.g., modifying test cases to pass tests).
 
-## 📂 项目结构
+## 📂 Project Structure
 
 ```text
 SimpleModularCoder/
-├── run_basic.py       # 启动入口
-├── README.md          # 说明文档
+├── run_basic.py       # Entry point
+├── README.md          # Documentation (Chinese)
+├── README_EN.md       # Documentation (English)
 └── src/
-    ├── agent.py       # Agent 核心逻辑
-    ├── tools.py       # 工具集 (含文件操作、命令执行、安全检查)
-    ├── prompts.py     # 各模式的 System Prompts
-    ├── session.py     # 会话管理
-    ├── types.py       # 类型定义
-    └── llm_config.json # LLM 配置
+    ├── agent.py       # Core Agent logic
+    ├── tools.py       # Toolset (File ops, Command exec, Security checks)
+    ├── prompts.py     # System Prompts for each mode
+    ├── session.py     # Session management
+    ├── types.py       # Type definitions
+    └── llm_config.json # LLM Configuration
 ```
