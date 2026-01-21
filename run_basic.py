@@ -3,8 +3,9 @@ import os
 import sys
 import subprocess
 import re
-from src.agent import Agent
-from src.prompts import DEFAULT_SYSTEM_PROMPT, ARCHITECT_SYSTEM_PROMPT, PURE_ARCHITECT_SYSTEM_PROMPT, BUILDER_SYSTEM_PROMPT
+import json
+from opencode_basic.agent import Agent
+from opencode_basic.prompts import DEFAULT_SYSTEM_PROMPT, ARCHITECT_SYSTEM_PROMPT, PURE_ARCHITECT_SYSTEM_PROMPT, BUILDER_SYSTEM_PROMPT
 
 def run_tests(test_path):
     """Runs pytest on the specified file and returns (success, output)."""
@@ -92,7 +93,35 @@ def main():
                 if module_path:
                     print(f"Detected module path: {module_path}")
                     
+                    # 1. Analyze Dependencies
+                    project_root, dep_graph = get_project_context(module_path)
+                    module_name = os.path.basename(module_path)
+                    
+                    dependency_context = ""
+                    allowed_read_paths = []
+                    
+                    if dep_graph and module_name in dep_graph:
+                        dependencies = dep_graph[module_name]
+                        if dependencies:
+                            print(f"Found dependencies for {module_name}: {dependencies}")
+                            dependency_context += "\n\n### DEPENDENCY INJECTION\n"
+                            dependency_context += "You depend on the following modules. You MUST read their `interface.py` to understand the API:\n"
+                            
+                            for dep in dependencies:
+                                # Assume standard structure: project_root/DepName
+                                dep_path = os.path.join(project_root, dep)
+                                if os.path.exists(dep_path):
+                                    allowed_read_paths.append(dep_path)
+                                    dependency_context += f"- **{dep}**: Path `{dep_path}`\n"
+                                else:
+                                    dependency_context += f"- **{dep}**: (Path not found at {dep_path})\n"
+                        else:
+                            print(f"Module {module_name} has no dependencies.")
+                    
                     # Apply constraints to the current agent immediately
+                    # We allow writing ONLY to module_path, but reading is generally open via tool, 
+                    # yet we explicitly mention allowed_dirs for clarity/safety if we enforced read.
+                    # Currently tool_set.allowed_dirs only restricts WRITES.
                     agent.tool_set.set_constraints(
                         allowed_dirs=[module_path],
                         readonly_files=["test_spec.py", "PROMPT.md", "interface.py"]
@@ -101,7 +130,8 @@ def main():
                     print("Entering Ralph Mode (Iterative Build & Test)...")
                     
                     max_attempts = 5
-                    current_prompt = user_input
+                    # Inject dependency info into the prompt
+                    current_prompt = user_input + dependency_context
                     
                     for attempt in range(max_attempts):
                         print(f"\n--- Attempt {attempt + 1}/{max_attempts} ---")
@@ -138,6 +168,9 @@ def main():
                                 "Please analyze `implementation.py` and `test_spec.py`, then FIX the code to pass the tests.\n"
                                 "DO NOT modify `test_spec.py`."
                             )
+                            # Re-inject dependency context for the retry as well, just in case
+                            if dependency_context:
+                                current_prompt += dependency_context
                 else:
                     # Fallback if no path detected
                     agent.run(user_input)
