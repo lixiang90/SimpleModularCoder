@@ -1,0 +1,6 @@
+{
+        "api_key": "your api key here",
+        "base_url": "https://api.deepseek.com",
+        "model": "deepseek-chat",
+        "temperature": 1.0
+}
