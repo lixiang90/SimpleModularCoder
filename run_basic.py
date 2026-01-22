@@ -77,6 +77,7 @@ def fix_relative_imports(module_path):
     directory is added to PYTHONPATH, making it a root package during testing.
     """
     files_to_check = ["implementation.py", "test_spec.py", "interface.py"]
+    module_name = os.path.basename(module_path)
     
     for filename in files_to_check:
         file_path = os.path.join(module_path, filename)
@@ -87,11 +88,10 @@ def fix_relative_imports(module_path):
             with open(file_path, 'r', encoding='utf-8') as f:
                 content = f.read()
             
-            # Replace 'from .interface' with 'from interface'
-            # Replace 'from .implementation' with 'from implementation'
-            # Use regex to be safe about boundaries
-            new_content = re.sub(r'from\s+\.interface\s+import', 'from interface import', content)
-            new_content = re.sub(r'from\s+\.implementation\s+import', 'from implementation import', new_content)
+            # Replace 'from .interface' or 'from interface' with 'from ModuleName.interface'
+            # This ensures absolute imports are used, avoiding ambiguity in multi-module setups
+            new_content = re.sub(r'from\s+(\.?interface)\s+import', f'from {module_name}.interface import', content)
+            new_content = re.sub(r'from\s+(\.?implementation)\s+import', f'from {module_name}.implementation import', new_content)
             
             if new_content != content:
                 print(f"Sanitizing imports in {filename}...")
@@ -201,7 +201,14 @@ def main():
                         print(f"\n--- Attempt {attempt + 1}/{max_attempts} ---")
                         
                         # Run Agent
-                        agent.run(current_prompt)
+                        response = agent.run(current_prompt)
+                        
+                        # Check for Architect Error signal
+                        if response and "ARCHITECT_ERROR" in response:
+                            print("\n🛑 Builder stopped due to Architect Error.")
+                            print("The agent detected a fatal issue with the provided architecture (e.g., in interface.py).")
+                            print("Please fix the files mentioned in the error above before retrying.")
+                            break
                         
                         # Run Tests
                         test_spec = os.path.join(module_path, "test_spec.py")

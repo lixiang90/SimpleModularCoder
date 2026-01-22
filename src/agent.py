@@ -86,9 +86,12 @@ class Agent:
     def run(self, user_input: str):
         """
         Agent Loop: User Input -> Think -> (Act -> Think)* -> Reply
+        Returns the final response content from the assistant.
         """
         # 1. Add user message
         self.session.add_user_message(user_input)
+
+        last_content = None
 
         # 2. Loop
         while self.running:
@@ -97,6 +100,7 @@ class Agent:
             
             # Call LLM
             response = self.llm.generate(context)
+            last_content = response.content
             
             # Add assistant message to history
             self.session.add_assistant_message(response.content, response.tool_calls)
@@ -116,6 +120,8 @@ class Agent:
             
             # No tools, break
             break
+        
+        return last_content
 
     def _execute_tool(self, tool_call: Dict[str, Any]):
         """
