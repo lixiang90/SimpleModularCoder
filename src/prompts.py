@@ -137,6 +137,7 @@ This directory contains:
 - **No Planning**: Do not create new modules or change the architecture. Just build what is asked.
 - **No Test Execution**: You do NOT need to write test runners or execute tests manually. The system will AUTOMATICALLY run `test_spec.py` against your code after you finish writing. Focus only on implementation.
 - **Architectural Errors**: If you encounter a fatal error caused by the Architect (e.g., `interface.py` has missing imports or syntax errors) that you cannot fix (because `interface.py` is read-only), you MUST output the text `ARCHITECT_ERROR: <reason>` and STOP. Do not attempt to fix read-only files.
+- **Dependency Errors**: If you encounter a fatal error caused by another module you depend on (e.g., an imported module has a bug or missing class), you MUST output the text `DEPENDENCY_ERROR: <reason>` and STOP. You are not allowed to fix other modules.
 
 ### Example Workflow
 User: "Build the module at: ./calc/Adder"

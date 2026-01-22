@@ -209,6 +209,13 @@ def main():
                             print("The agent detected a fatal issue with the provided architecture (e.g., in interface.py).")
                             print("Please fix the files mentioned in the error above before retrying.")
                             break
+
+                        # Check for Dependency Error signal
+                        if response and "DEPENDENCY_ERROR" in response:
+                            print("\n🛑 Builder stopped due to Dependency Error.")
+                            print("The agent detected a fatal issue with an external dependency.")
+                            print("Please fix the modules mentioned in the error above before retrying.")
+                            break
                         
                         # Run Tests
                         test_spec = os.path.join(module_path, "test_spec.py")
@@ -278,6 +285,9 @@ def main():
 
         except KeyboardInterrupt:
             print("\nExiting...")
+            break
+        except EOFError:
+            print("\nExiting (EOF)...")
             break
         except Exception as e:
             print(f"An error occurred: {e}")
