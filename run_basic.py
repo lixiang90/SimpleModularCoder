@@ -7,14 +7,23 @@ import json
 from opencode_basic.agent import Agent
 from opencode_basic.prompts import DEFAULT_SYSTEM_PROMPT, ARCHITECT_SYSTEM_PROMPT, PURE_ARCHITECT_SYSTEM_PROMPT, BUILDER_SYSTEM_PROMPT
 
-def run_tests(test_path):
+def run_tests(test_path, additional_paths=None):
     """Runs pytest on the specified file and returns (success, output)."""
     try:
+        # Prepare environment with updated PYTHONPATH
+        env = os.environ.copy()
+        if additional_paths:
+            # Add paths to PYTHONPATH (prepend)
+            current_pythonpath = env.get("PYTHONPATH", "")
+            new_paths = os.pathsep.join(additional_paths)
+            env["PYTHONPATH"] = f"{new_paths}{os.pathsep}{current_pythonpath}" if current_pythonpath else new_paths
+            
         # Use sys.executable to ensure we use the same python environment
         result = subprocess.run(
             [sys.executable, "-m", "pytest", test_path],
             capture_output=True,
-            text=True
+            text=True,
+            env=env
         )
         return result.returncode == 0, result.stdout + result.stderr
     except Exception as e:
@@ -60,6 +69,36 @@ def get_project_context(module_path):
         
         current = parent
     return None, None
+
+def fix_relative_imports(module_path):
+    """
+    Sanitizes imports in the module files to ensure compatibility with the test runner.
+    Specifically, removes relative imports (e.g., 'from .interface') because the module
+    directory is added to PYTHONPATH, making it a root package during testing.
+    """
+    files_to_check = ["implementation.py", "test_spec.py", "interface.py"]
+    
+    for filename in files_to_check:
+        file_path = os.path.join(module_path, filename)
+        if not os.path.exists(file_path):
+            continue
+            
+        try:
+            with open(file_path, 'r', encoding='utf-8') as f:
+                content = f.read()
+            
+            # Replace 'from .interface' with 'from interface'
+            # Replace 'from .implementation' with 'from implementation'
+            # Use regex to be safe about boundaries
+            new_content = re.sub(r'from\s+\.interface\s+import', 'from interface import', content)
+            new_content = re.sub(r'from\s+\.implementation\s+import', 'from implementation import', new_content)
+            
+            if new_content != content:
+                print(f"Sanitizing imports in {filename}...")
+                with open(file_path, 'w', encoding='utf-8') as f:
+                    f.write(new_content)
+        except Exception as e:
+            print(f"Warning: Failed to sanitize imports in {filename}: {e}")
 
 def main():
     parser = argparse.ArgumentParser(description="OpenCode Basic - Autonomous Coding Agent")
@@ -167,13 +206,26 @@ def main():
                         # Run Tests
                         test_spec = os.path.join(module_path, "test_spec.py")
                         print(f"Running tests: {test_spec}")
-                        success, output = run_tests(test_spec)
+                        
+                        # Fix Paths: Add module_path and project_root to PYTHONPATH
+                        # This allows 'import interface' or 'from implementation import ...' to work without relative imports
+                        
+                        # Pre-check: Sanitize imports to remove relative dots
+                        fix_relative_imports(module_path)
+                        
+                        paths_to_add = [module_path]
+                        if project_root:
+                            paths_to_add.append(project_root)
+                            
+                        success, output = run_tests(test_spec, additional_paths=paths_to_add)
                         
                         if success:
                             print("\n✅ Tests Passed! Module build successful.")
                             break
                         else:
                             print("\n❌ Tests Failed.")
+                            print("Test Output:")
+                            print(output)
                             # Check if max attempts reached
                             if attempt == max_attempts - 1:
                                 print("Max attempts reached. Build failed.")

@@ -96,14 +96,17 @@ For a project named `project_name`:
 
    - **`test_spec.py`**:
      - Comprehensive Pytest cases asserting the expected behavior of the future implementation.
-     - Import the classes/functions from `interface` (assuming they will be implemented with the same names).
+     - **CRITICAL**: You must import the class/function to be tested from `implementation`, NOT `interface`.
+     - **Import Style**: Use ABSOLUTE imports (assume the module directory is in PYTHONPATH). 
+       - `from implementation import MyClass` (Correct)
+       - `from .implementation import MyClass` (Incorrect - avoid relative imports)
 
 ### Example Workflow
 User: "Build a Calculator"
 Agent:
 1. Call `write_file("calc/dependency_graph.json", ...)`
 2. Call `write_file("calc/Adder/interface.py", "class Adder:\n    def add(self, a: int, b: int) -> int:\n        ...")`
-3. Call `write_file("calc/Adder/test_spec.py", ...)`
+3. Call `write_file("calc/Adder/test_spec.py", "from implementation import Adder\n\ndef test_add():\n    assert Adder().add(1, 2) == 3")`
 4. Call `write_file("calc/Adder/PROMPT.md", ...)`
 """
 
@@ -129,6 +132,8 @@ This directory contains:
 - **Compliance**: You must implement ALL abstract methods defined in `interface.py`.
 - **Maintenance**: When fixing bugs, prefer modifying the existing code over rewriting from scratch unless the changes are extensive.
 - **Importing**: Assume `interface.py` is in the same package. Use `from .interface import ...` or `from interface import ...` as appropriate for the structure.
+- **Naming**: Check `test_spec.py` imports to see what class name is expected. Usually, you should implement the class with the SAME name as in `interface.py`, but in `implementation.py`.
+  - Example: If `interface.py` has `class Adder`, and `test_spec.py` imports `Adder` from `implementation`, you should write `from .interface import Adder as AbstractAdder` and `class Adder(AbstractAdder):` in `implementation.py`.
 - **No Planning**: Do not create new modules or change the architecture. Just build what is asked.
 - **No Test Execution**: You do NOT need to write test runners or execute tests manually. The system will AUTOMATICALLY run `test_spec.py` against your code after you finish writing. Focus only on implementation.
 
@@ -136,6 +141,6 @@ This directory contains:
 User: "Build the module at: ./calc/Adder"
 Agent:
 1. Read `./calc/Adder/PROMPT.md`, `./calc/Adder/interface.py`, `./calc/Adder/test_spec.py`.
-2. Think: "I need to implement the 'add' method for the Adder class."
-3. Call `write_file("./calc/Adder/implementation.py", "from .interface import Adder\n\nclass AdderImpl(Adder):\n    def add(self, a, b):\n        return a + b")`
+2. Think: "I need to implement the 'add' method for the Adder class. test_spec expects 'Adder' from implementation."
+3. Call `write_file("./calc/Adder/implementation.py", "from .interface import Adder as AbstractAdder\n\nclass Adder(AbstractAdder):\n    def add(self, a, b):\n        return a + b")`
 """
