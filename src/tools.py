@@ -46,6 +46,27 @@ TOOL_DEFINITIONS = [
     {
         "type": "function",
         "function": {
+            "name": "append_file",
+            "description": "Append content to a file. Useful for large files to avoid token limits.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "path": {
+                        "type": "string",
+                        "description": "The path to the file to append to (relative to workspace)"
+                    },
+                    "content": {
+                        "type": "string",
+                        "description": "The content to append to the file"
+                    }
+                },
+                "required": ["path", "content"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
             "name": "edit_file",
             "description": "Replace a specific string in a file with a new string.",
             "parameters": {
@@ -186,6 +207,26 @@ class ToolSet:
             return f"Successfully wrote to {path}"
         except Exception as e:
             return f"Error writing file {path}: {str(e)}"
+
+    def append_file(self, path: str, content: str) -> str:
+        """Appends content to a file."""
+        try:
+            safe_path = self._resolve_path(path)
+            
+            # Check constraints
+            error = self._check_write_permission(safe_path)
+            if error:
+                return f"Error: {error}"
+
+            if not os.path.exists(safe_path):
+                 return f"Error: File not found: {path}. Use write_file to create new files."
+
+            with open(safe_path, 'a', encoding='utf-8') as f:
+                f.write(content)
+            return f"Successfully appended to {path}"
+        except Exception as e:
+            return f"Error appending to file {path}: {str(e)}"
+
 
     def edit_file(self, path: str, old_string: str, new_string: str) -> str:
         """Replaces old_string with new_string in the file."""

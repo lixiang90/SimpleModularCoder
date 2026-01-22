@@ -1,5 +1,6 @@
 import json
 import os
+import re
 from typing import List, Dict, Any
 from openai import OpenAI
 from .session import Session
@@ -129,13 +130,73 @@ class Agent:
         """
         func_name = tool_call['function']['name']
         call_id = tool_call['id']
+        args_str = tool_call['function']['arguments']
         
         try:
-            args = json.loads(tool_call['function']['arguments'])
+            args = json.loads(args_str)
         except json.JSONDecodeError:
-             output = f"Error: Invalid JSON arguments for {func_name}"
-             self.session.add_tool_output(call_id, func_name, output)
-             return
+             # Attempt 1: Remove Markdown code blocks
+             repaired_str = re.sub(r'^```json\s*', '', args_str, flags=re.MULTILINE | re.IGNORECASE)
+             repaired_str = re.sub(r'^```\s*', '', repaired_str, flags=re.MULTILINE)
+             repaired_str = re.sub(r'\s*```$', '', repaired_str, flags=re.MULTILINE)
+             repaired_str = repaired_str.strip()
+             
+             try:
+                 args = json.loads(repaired_str)
+                 print(f"\n>>> JSON Repair: Successfully stripped Markdown formatting.")
+             except json.JSONDecodeError as e:
+                 # Attempt 2: Handle Truncated JSON (specifically for write_file/append_file)
+                 if func_name in ['write_file', 'append_file']:
+                     # Heuristic: Try to close the JSON string and object
+                     # 1. Strip trailing whitespace
+                     clean_str = args_str.rstrip()
+                     # 2. Remove trailing backslash if present (to avoid escaping the closing quote)
+                     if clean_str.endswith('\\'):
+                         clean_str = clean_str[:-1]
+                     
+                     repaired_str = clean_str + '"}'
+                     
+                     try:
+                         args = json.loads(repaired_str)
+                         print(f"\n>>> JSON Repair: Detected truncated JSON. Auto-completed quotes/braces.")
+                         
+                         # Execute the tool with partial arguments
+                         if hasattr(self.tool_set, func_name):
+                             method = getattr(self.tool_set, func_name)
+                             real_output = method(**args)
+                             
+                             output = (
+                                 f"WARNING: The tool call argument was TRUNCATED due to length limits.\n"
+                                 f"I have auto-repaired the JSON and executed '{func_name}' with the PARTIAL content.\n"
+                                 f"Result: {real_output}\n\n"
+                                 f"IMPORTANT: The file is INCOMPLETE. \n"
+                                 f"You MUST immediately call 'append_file' to write the REST of the content.\n"
+                                 f"Resume exactly from the end of the written content."
+                             )
+                             print(f"\n>>> Auto-Repair Execution: {output}")
+                             self.session.add_tool_output(call_id, func_name, output)
+                             return
+                     except json.JSONDecodeError:
+                         pass # Failed to repair, fall through to error reporting
+
+                 # Attempt 3: Escape unescaped newlines in values (Heuristic)
+                 # This handles cases where LLM writes: "content": "Line1\nLine2" as actual newlines
+                 # We simply try to escape control characters if they cause issues
+                 # But robustly, we'll just stash it for now as requested.
+                 
+                 # Stash invalid JSON for debugging
+                 stash_path = os.path.join(self.tool_set.base_dir, "debug_invalid_json.txt")
+                 try:
+                     with open(stash_path, "w", encoding="utf-8") as f:
+                         f.write(args_str)
+                     stash_msg = f"Raw arguments stashed to {stash_path}"
+                 except Exception as write_err:
+                     stash_msg = f"Failed to stash raw arguments: {write_err}"
+
+                 output = f"Error: Invalid JSON arguments for {func_name}: {e}. {stash_msg}"
+                 print(f"\n>>> JSON Error: {output}")
+                 self.session.add_tool_output(call_id, func_name, output)
+                 return
 
         print(f"\n>>> Executing Tool: {func_name} with args: {args}")
         
