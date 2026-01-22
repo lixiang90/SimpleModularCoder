@@ -100,6 +100,74 @@ def fix_relative_imports(module_path):
         except Exception as e:
             print(f"Warning: Failed to sanitize imports in {filename}: {e}")
 
+def fix_dependency_imports(module_path, project_root, dependencies):
+    """
+    Automatically fixes imports in test_spec.py to point to implementation
+    for classes that are defined there, instead of interface.
+    This fixes the common Architect error of importing abstract classes for instantiation.
+    """
+    test_spec_path = os.path.join(module_path, "test_spec.py")
+    if not os.path.exists(test_spec_path):
+        return
+
+    try:
+        with open(test_spec_path, 'r', encoding='utf-8') as f:
+            content = f.read()
+
+        modified = False
+        new_lines = []
+        
+        for line in content.splitlines():
+            # Match: from Dep.interface import A, B, C
+            # We handle simple case where module name starts with a dependency name
+            match = re.match(r'^\s*from\s+([\w\.]+)\.interface\s+import\s+(.+)$', line)
+            if match:
+                dep_module = match.group(1) # e.g. "Card"
+                root_dep_name = dep_module.split('.')[0]
+                
+                if root_dep_name in dependencies:
+                    imported_items_str = match.group(2)
+                    # Handle multiple items, remove comments if any (simple split)
+                    imported_items = [x.strip() for x in imported_items_str.split(',')]
+                    
+                    impl_items = []
+                    interface_items = []
+                    
+                    # Check implementation file
+                    impl_path = os.path.join(project_root, root_dep_name, "implementation.py")
+                    
+                    if os.path.exists(impl_path):
+                        with open(impl_path, 'r', encoding='utf-8') as f_impl:
+                            impl_content = f_impl.read()
+                        
+                        for item in imported_items:
+                            # Clean item name (remove " as Alias")
+                            item_name = item.split(' as ')[0].strip()
+                            
+                            # Check if defined in implementation (class or def)
+                            # Regex looks for "class Item" or "def Item" at start of line
+                            if re.search(r'^(class|def)\s+' + re.escape(item_name) + r'[:\(]', impl_content, re.MULTILINE):
+                                impl_items.append(item)
+                            else:
+                                interface_items.append(item)
+                        
+                        if impl_items:
+                            if interface_items:
+                                new_lines.append(f"from {dep_module}.interface import {', '.join(interface_items)}")
+                            new_lines.append(f"from {dep_module}.implementation import {', '.join(impl_items)}")
+                            modified = True
+                            continue
+            
+            new_lines.append(line)
+
+        if modified:
+            print(f"Auto-fixing dependency imports in {os.path.basename(test_spec_path)}...")
+            with open(test_spec_path, 'w', encoding='utf-8') as f:
+                f.write('\n'.join(new_lines))
+                
+    except Exception as e:
+        print(f"Warning: Failed to fix dependency imports: {e}")
+
 def main():
     parser = argparse.ArgumentParser(description="OpenCode Basic - Autonomous Coding Agent")
     parser.add_argument(
@@ -170,6 +238,9 @@ def main():
                             print(f"Found dependencies for {module_name}: {dependencies}")
                             dependency_context += "\n\n### DEPENDENCY INJECTION\n"
                             dependency_context += "You depend on the following modules. You MUST read their `interface.py` to understand the API:\n"
+                            
+                            # Auto-fix test_spec.py imports for dependencies
+                            fix_dependency_imports(module_path, project_root, dependencies)
                             
                             for dep in dependencies:
                                 # Assume standard structure: project_root/DepName
